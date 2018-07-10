@@ -153,8 +153,8 @@ public class OrdersController extends BaseController{
 		}
 		
 		//扣减库存，库存不足回滚？？
-//		if(true)
-//			throw new BusinessException(ResultCode.PARAM_IS_INVALID);
+		if(true)
+			throw new BusinessException(ResultCode.PARAM_IS_INVALID);
 		
 		return buildBaseCudRespData(record.getId());
 	}
