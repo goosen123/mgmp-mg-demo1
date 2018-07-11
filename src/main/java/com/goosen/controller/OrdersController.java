@@ -13,7 +13,6 @@ import javax.annotation.Resource;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -26,7 +25,6 @@ import com.goosen.commons.annotations.ResponseResult;
 import com.goosen.commons.enums.ResultCode;
 import com.goosen.commons.exception.BusinessException;
 import com.goosen.commons.model.po.Orders;
-import com.goosen.commons.model.po.OrdersProduct;
 import com.goosen.commons.model.request.orders.OrdersSubItemReqData;
 import com.goosen.commons.model.request.orders.OrdersSubReqData;
 import com.goosen.commons.model.response.BaseCudRespData;
@@ -36,10 +34,8 @@ import com.goosen.commons.service.OrdersService;
 import com.goosen.commons.service.ProductAttrService;
 import com.goosen.commons.service.ProductService;
 import com.goosen.commons.service.UserService;
-import com.goosen.commons.utils.BeanUtil;
 import com.goosen.commons.utils.CheckUtil;
 import com.goosen.commons.utils.CommonUtil;
-import com.goosen.commons.utils.IdGenUtil;
 import com.goosen.commons.utils.NumberUtil;
 
 @Api(value="订单管理",description="订单管理")
@@ -63,7 +59,6 @@ public class OrdersController extends BaseController{
 	@ApiOperation(value="提交订单")
 	@ResponseResult
 	@RequestMapping(value = {"submit"},method=RequestMethod.POST)
-	@Transactional(readOnly=false,rollbackFor=Exception.class)
 	public BaseCudRespData<String> submit(@Validated @RequestBody OrdersSubReqData reqData){
 		
 		if(reqData == null)
@@ -119,44 +114,18 @@ public class OrdersController extends BaseController{
 			productList.add(productMap);
 		}
 		
-		//生成订单
-		Orders record = new Orders();
-		record.setId(IdGenUtil.uuid());
-		record.setCode(ordersService.createOrdersCode());
-		record.setUserId(userId);
-		record.setUserName(userName);
-		record.setTotalCost(totalCost);
-		record.setTotalVolume(totalVolume);
-		record.setOrderStatus(0);
-		record.setIsPay(0);
-		record.setOrderRemark(reqData.getOrderRemark());
-		ordersService.save(record);
-		//生成订单商品
-		for (int i = 0; i < itemList.size(); i++) {
-			OrdersSubItemReqData ordersSubItemReqData = itemList.get(i);
-			Integer itemVolume = ordersSubItemReqData.getItemVolume();
-			Map<String, Object> productMap = productList.get(i);
-			Map<String, Object> productAttrMap = productAttrList.get(i);
-			Double salePrice = CommonUtil.getDoubleValue(productAttrMap, "salePrice");
-			String productId = CommonUtil.getStrValue(productMap, "id");
-			String productAttrId = CommonUtil.getStrValue(productAttrMap, "id");
-			OrdersProduct ordersProduct = new OrdersProduct();
-			BeanUtil.mapToBean(productMap, ordersProduct);
-			BeanUtil.mapToBean(productAttrMap, ordersProduct);
-			ordersProduct.setId(IdGenUtil.uuid());
-			ordersProduct.setOrderId(record.getId());
-			ordersProduct.setProductId(productId);
-			ordersProduct.setProductAttrId(productAttrId);
-			ordersProduct.setItemVolume(itemVolume);
-			ordersProduct.setItemCost(NumberUtil.multi(salePrice, CommonUtil.getDoubleValue(itemVolume), 2));
-			ordersProductService.save(ordersProduct);
-		}
+		Map<String,Object> paramsSub = new HashMap<String, Object>();
+		paramsSub.put("userId", userId);
+		paramsSub.put("userName", userName);
+		paramsSub.put("totalCost", totalCost);
+		paramsSub.put("totalVolume", totalVolume);
+		paramsSub.put("orderRemark", reqData.getOrderRemark());
+		Orders record = ordersService.submit(itemList,productList,productAttrList,paramsSub);
+		String orderId = null;
+		if(record != null)
+			orderId = record.getId();
 		
-		//扣减库存，库存不足回滚？？
-		if(true)
-			throw new BusinessException(ResultCode.PARAM_IS_INVALID);
-		
-		return buildBaseCudRespData(record.getId());
+		return buildBaseCudRespData(orderId);
 	}
 	
 	@ApiOperation(value="获取订单详情")
